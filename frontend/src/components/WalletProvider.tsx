@@ -3,11 +3,14 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ethers } from 'ethers';
 
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'http://127.0.0.1:8545';
+const CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '31337');
+
 interface WalletContextType {
     address: string | null;
     isConnected: boolean;
     isConnecting: boolean;
-    provider: ethers.BrowserProvider | null;
+    provider: ethers.Provider | null;
     signer: ethers.Signer | null;
     chainId: number | null;
     connect: () => Promise<void>;
@@ -30,16 +33,19 @@ const WalletContext = createContext<WalletContextType>({
 export function WalletProvider({ children }: { children: ReactNode }) {
     const [address, setAddress] = useState<string | null>(null);
     const [isConnecting, setIsConnecting] = useState(false);
-    const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
+    const [provider, setProvider] = useState<ethers.Provider | null>(null);
     const [signer, setSigner] = useState<ethers.Signer | null>(null);
     const [chainId, setChainId] = useState<number | null>(null);
 
     useEffect(() => {
-        // Check if already connected
-        checkConnection();
+        // Always create a read-only provider for blockchain reads
+        const readOnlyProvider = new ethers.JsonRpcProvider(RPC_URL, CHAIN_ID);
+        setProvider(readOnlyProvider);
+        setChainId(CHAIN_ID);
 
-        // Listen for account changes
+        // If MetaMask is available, try to connect for signing
         if (typeof window !== 'undefined' && window.ethereum) {
+            checkMetaMaskConnection();
             window.ethereum.on('accountsChanged', handleAccountsChanged);
             window.ethereum.on('chainChanged', handleChainChanged);
         }
@@ -52,55 +58,42 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         };
     }, []);
 
-    const checkConnection = async () => {
+    const checkMetaMaskConnection = async () => {
         if (typeof window === 'undefined' || !window.ethereum) return;
-
         try {
             const browserProvider = new ethers.BrowserProvider(window.ethereum);
             const accounts = await browserProvider.listAccounts();
-
             if (accounts.length > 0) {
                 const signerInstance = await browserProvider.getSigner();
                 const network = await browserProvider.getNetwork();
-
                 setProvider(browserProvider);
                 setSigner(signerInstance);
                 setAddress(await signerInstance.getAddress());
                 setChainId(Number(network.chainId));
             }
         } catch (error) {
-            console.error('Check connection error:', error);
+            console.error('MetaMask check error:', error);
         }
     };
 
     const handleAccountsChanged = (accounts: string[]) => {
-        if (accounts.length === 0) {
-            disconnect();
-        } else {
-            setAddress(accounts[0]);
-            checkConnection();
-        }
+        if (accounts.length === 0) { disconnect(); }
+        else { setAddress(accounts[0]); checkMetaMaskConnection(); }
     };
 
-    const handleChainChanged = () => {
-        window.location.reload();
-    };
+    const handleChainChanged = () => { window.location.reload(); };
 
     const connect = async () => {
         if (typeof window === 'undefined' || !window.ethereum) {
-            // Redirect to setup page instead of alert
-            window.location.href = '/setup';
+            console.log('MetaMask not available — using read-only provider');
             return;
         }
-
         setIsConnecting(true);
         try {
             const browserProvider = new ethers.BrowserProvider(window.ethereum);
             await browserProvider.send('eth_requestAccounts', []);
-
             const signerInstance = await browserProvider.getSigner();
             const network = await browserProvider.getNetwork();
-
             setProvider(browserProvider);
             setSigner(signerInstance);
             setAddress(await signerInstance.getAddress());
@@ -112,10 +105,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
 
     const disconnect = () => {
-        setAddress(null);
-        setProvider(null);
+        // Revert to read-only provider
+        const readOnlyProvider = new ethers.JsonRpcProvider(RPC_URL, CHAIN_ID);
+        setProvider(readOnlyProvider);
         setSigner(null);
-        setChainId(null);
+        setAddress(null);
+        setChainId(CHAIN_ID);
     };
 
     const signMessage = async (message: string): Promise<string> => {

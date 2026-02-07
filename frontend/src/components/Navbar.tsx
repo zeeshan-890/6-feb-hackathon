@@ -42,7 +42,7 @@ export default function Navbar() {
                             <>
                                 <div className="glass px-3 py-2 rounded-lg flex items-center gap-2">
                                     <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                                    <span className="text-sm">{user?.email}</span>
+                                    <span className="text-sm">{user?.email || (user?.walletAddress ? `${user.walletAddress.slice(0,6)}...${user.walletAddress.slice(-4)}` : 'Connected')}</span>
                                 </div>
                                 <button
                                     onClick={logout}

@@ -36,11 +36,15 @@ router.post('/', authenticate, async (req, res) => {
         // Convert voteType to boolean (0/1 or true/false)
         const isConfirm = voteType === 'CONFIRM' || voteType === 0 || voteType === true;
 
-        // Submit transaction via master wallet
-        // Note: In a real app, we'd check if user already voted or use a relayer to map user -> on-chain identity
-        // For this demo, master wallet pays gas, and we trust the backend's auth
+        // Get the user's private key to sign the vote from their wallet
+        const authToken = req.headers.authorization.split(' ')[1];
+        const privateKey = exportPrivateKey(authToken);
 
-        await voteOnRumor(rumorId, isConfirm);
+        if (!privateKey) {
+            return res.status(500).json({ error: 'Could not retrieve wallet key' });
+        }
+
+        await voteOnRumor(rumorId, isConfirm, privateKey);
 
         res.json({
             success: true,

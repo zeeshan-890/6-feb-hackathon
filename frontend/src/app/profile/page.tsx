@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useWallet } from '@/hooks/useWallet'; // Keep for Connect Wallet fallback if needed
 import { useAuth } from '@/components/AuthProvider';
 import { useContracts, StudentData } from '@/hooks/useContracts';
 import { useRouter } from 'next/navigation';
@@ -9,8 +8,7 @@ import Link from 'next/link';
 
 export default function ProfilePage() {
     const router = useRouter();
-    const { isConnected: isWalletConnected, address: walletAddress } = useWallet();
-    const { token, user } = useAuth();
+    const { token, user, isLoggedIn } = useAuth();
     const { getStudent, getCredibilityBalance, isRegistered } = useContracts();
 
     const [profile, setProfile] = useState<StudentData | null>(null);
@@ -19,14 +17,12 @@ export default function ProfilePage() {
     const [registered, setRegistered] = useState(false);
 
     useEffect(() => {
-        if (token && user?.walletAddress) {
+        if (isLoggedIn && user?.walletAddress) {
             loadProfile(user.walletAddress);
-        } else if (isWalletConnected && walletAddress) {
-            loadProfile(walletAddress);
         } else {
             setLoading(false);
         }
-    }, [token, user, isWalletConnected, walletAddress]);
+    }, [isLoggedIn, user]);
 
     const loadProfile = async (targetAddress: string) => {
         setLoading(true);
@@ -47,7 +43,7 @@ export default function ProfilePage() {
         setLoading(false);
     };
 
-    if (!token && !isWalletConnected) {
+    if (!isLoggedIn) {
         return (
             <div className="container mx-auto px-4 py-12 text-center">
                 <div className="card max-w-md mx-auto">
@@ -141,7 +137,7 @@ export default function ProfilePage() {
                             <span className={`badge ${statusInfo.badge}`}>{statusInfo.label}</span>
                         </div>
                         <p className="text-gray-400 text-sm font-mono mb-2">
-                            {user?.walletAddress || walletAddress}
+                            {user?.walletAddress}
                         </p>
                         <p className="text-gray-500 text-sm">{statusInfo.description}</p>
                         <p className="text-gray-600 text-xs mt-2">

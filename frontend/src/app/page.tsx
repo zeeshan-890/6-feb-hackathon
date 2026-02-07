@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import RumorCard from '@/components/RumorCard';
-import { useWallet } from '@/hooks/useWallet';
+import { useAuth } from '@/components/AuthProvider';
 import { useContracts } from '@/hooks/useContracts';
 import { getRumorContent } from '@/lib/api';
 
 export default function Home() {
-    const { isConnected } = useWallet();
+    const { isLoggedIn, user } = useAuth();
     const { getTotalRumors, getRumor, isRegistered } = useContracts();
 
     const [rumors, setRumors] = useState<any[]>([]);
@@ -20,11 +20,11 @@ export default function Home() {
     useEffect(() => {
         loadRumors();
         checkRegistration();
-    }, [isConnected]);
+    }, [isLoggedIn, user]);
 
     const checkRegistration = async () => {
-        if (isConnected) {
-            const registered = await isRegistered();
+        if (isLoggedIn && user?.walletAddress) {
+            const registered = await isRegistered(user.walletAddress);
             setUserRegistered(registered);
         }
     };
@@ -115,7 +115,7 @@ export default function Home() {
                     Decentralized, anonymous rumor verification powered by community voting and AI
                 </p>
 
-                {!isConnected && (
+                {!isLoggedIn && (
                     <div className="mt-8">
                         <Link href="/register" className="btn-primary inline-block">
                             Get Started →
@@ -123,7 +123,7 @@ export default function Home() {
                     </div>
                 )}
 
-                {isConnected && !userRegistered && (
+                {isLoggedIn && !userRegistered && (
                     <div className="mt-8">
                         <Link href="/register" className="btn-primary inline-block">
                             Complete Registration →
@@ -148,7 +148,7 @@ export default function Home() {
                 </div>
                 <div className="card text-center">
                     <div className="text-3xl font-bold gradient-text">
-                        {isConnected ? (userRegistered ? '✓' : '—') : '—'}
+                        {isLoggedIn ? (userRegistered ? '✓' : '—') : '—'}
                     </div>
                     <div className="text-gray-400 text-sm">Your Status</div>
                 </div>
@@ -186,7 +186,7 @@ export default function Home() {
                     </button>
                 </div>
 
-                {isConnected && userRegistered && (
+                {isLoggedIn && userRegistered && (
                     <Link href="/submit" className="btn-primary">
                         + Submit Rumor
                     </Link>
@@ -219,7 +219,7 @@ export default function Home() {
                 <div className="text-center py-12">
                     <div className="text-6xl mb-4">📭</div>
                     <p className="text-gray-400 text-lg">No rumors found</p>
-                    {isConnected && userRegistered && (
+                    {isLoggedIn && userRegistered && (
                         <Link href="/submit" className="btn-primary inline-block mt-4">
                             Be the first to submit!
                         </Link>

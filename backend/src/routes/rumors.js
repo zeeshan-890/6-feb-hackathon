@@ -119,15 +119,58 @@ router.post('/prepare', upload.array('evidence', 5), async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const { status, limit = 20, offset = 0, search } = req.query;
-        // In a real implementation with DB + Blockchain sync, we'd query the DB here
-        // Since we relies on blockchain mostly, we might need to fetch from chain or valid cache
-        // For hackathon, we can restart the cache on server restart or implement simple sync
+        const limitNum = parseInt(limit);
+        const offsetNum = parseInt(offset);
 
-        // This part requires a proper DB sync service which is out of scope for this specific task
-        // But let's assume indexer is running
+        // Get total rumors from blockchain
+        const { initializeProvider } = require('../services/blockchainService');
+        const { contracts } = initializeProvider();
 
-        // For now, returning empty or basic list logic
-        res.json({ rumors: [], total: 0 });
+        if (!contracts.rumorRegistry) {
+            return res.json({ rumors: [], total: 0 });
+        }
+
+        const totalRumors = Number(await contracts.rumorRegistry.getTotalRumors());
+
+        if (totalRumors === 0) {
+            return res.json({ rumors: [], total: 0 });
+        }
+
+        // Fetch rumors from blockchain (newest first)
+        const rumors = [];
+        const startId = Math.max(1, totalRumors - offsetNum);
+        const endId = Math.max(1, startId - limitNum + 1);
+
+        for (let id = startId; id >= endId && id >= 1; id--) {
+            try {
+                const rumor = await getRumor(id);
+                if (rumor && rumor.visible) {
+                    // Filter by status if provided
+                    if (status && rumor.status !== status.toUpperCase()) {
+                        continue;
+                    }
+
+                    // Fetch content from IPFS
+                    let content = null;
+                    if (rumor.contentHash) {
+                        const contentResult = await getContent(rumor.contentHash);
+                        if (contentResult.success) {
+                            content = contentResult.content;
+                        }
+                    }
+
+                    rumors.push({
+                        ...rumor,
+                        content,
+                        evidenceUrls: rumor.evidenceHashes?.map(h => getGatewayUrl(h)) || [],
+                    });
+                }
+            } catch (err) {
+                console.error(`Error fetching rumor ${id}:`, err.message);
+            }
+        }
+
+        res.json({ rumors, total: totalRumors });
     } catch (error) {
         console.error('Rumor list error:', error);
         res.status(500).json({ error: 'Failed to fetch rumors' });
