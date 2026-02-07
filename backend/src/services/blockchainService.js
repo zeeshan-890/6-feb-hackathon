@@ -8,6 +8,7 @@ const IDENTITY_REGISTRY_ABI = [
     'event StudentRegistered(uint256 indexed studentID, address indexed wallet, uint256 timestamp)',
     'event StatusChanged(uint256 indexed studentID, uint8 oldStatus, uint8 newStatus)',
     'event CredibilityUpdated(uint256 indexed studentID, uint256 oldScore, uint256 newScore)',
+    'function registerStudent(bytes32 emailHMAC, bytes signature) external',
     'function getStudent(address wallet) view returns (tuple(uint256 studentID, address walletAddress, bytes32 emailHMAC, uint256 credibilityScore, uint8 status, uint256 votingPower, uint256 registeredAt, uint256 totalPosts, uint256 totalVotes, uint256 accuratePredictions, uint256 inaccuratePredictions, uint256 discreditedUntil, uint256 postsToday, uint256 lastPostDate, uint256 votesThisHour, uint256 lastVoteHour))',
     'function isRegistered(address wallet) view returns (bool)',
 ];
@@ -24,6 +25,7 @@ const RUMOR_REGISTRY_ABI = [
 
 const VOTING_SYSTEM_ABI = [
     'event VoteCast(uint256 indexed voteID, uint256 indexed rumorID, uint256 indexed voterID, uint8 voteType, uint256 weight, uint256 timestamp)',
+    'function voteOnRumor(uint256 rumorID, uint8 voteType) external returns (uint256)',
     'function getVote(uint256 voteID) view returns (tuple(uint256 voteID, uint256 rumorID, uint256 voterID, address voterWallet, uint8 voteType, uint256 voterWeight, uint256 voterCredibility, uint256 timestamp))',
     'function getVotesForRumor(uint256 rumorID) view returns (uint256[])',
     'function hasUserVoted(uint256 rumorID, address voter) view returns (bool)',
@@ -395,6 +397,9 @@ async function registerStudentOnChain(privateKey, emailHash) {
     const { contracts, provider } = initializeProvider();
     const userWallet = new ethers.Wallet(privateKey, provider);
 
+    // Ensure emailHash is 0x-prefixed for ethers bytes32
+    const emailHashBytes = emailHash.startsWith('0x') ? emailHash : '0x' + emailHash;
+
     // 1. Recover signature for IdentityRegistry
     // The contract verifies: signer == msg.sender
     // It also checks signature of (emailHMAC + msg.sender)
@@ -403,14 +408,14 @@ async function registerStudentOnChain(privateKey, emailHash) {
     // bytes32 ethSignedHash = messageHash.toEthSignedMessageHash();
     // address signer = ethSignedHash.recover(signature);
 
-    const messageHash = ethers.solidityPackedKeccak256(['bytes32', 'address'], [emailHash, userWallet.address]);
+    const messageHash = ethers.solidityPackedKeccak256(['bytes32', 'address'], [emailHashBytes, userWallet.address]);
     const signature = await userWallet.signMessage(ethers.getBytes(messageHash));
 
     // 2. Register
     const contractWithSigner = contracts.identityRegistry.connect(userWallet);
     console.log(`📝 Registering student on-chain: ${userWallet.address}`);
 
-    const tx = await contractWithSigner.registerStudent(emailHash, signature);
+    const tx = await contractWithSigner.registerStudent(emailHashBytes, signature);
     await tx.wait();
     console.log(`✅ Student registered on-chain: ${tx.hash}`);
     return tx.hash;

@@ -84,9 +84,29 @@ async function main() {
     console.log("   Granting BURNER_ROLE to IdentityRegistry...");
     await credibilityToken.grantBurnerRole(identityRegistryAddress);
 
-    // Transfer ownership of RumorRegistry to VotingSystem for vote recording
-    // Note: In production, you'd want a more sophisticated access control
-    console.log("   Setting up contract permissions...");
+    // Authorize RumorRegistry to call IdentityRegistry (incrementPostCount, etc.)
+    console.log("   Authorizing RumorRegistry on IdentityRegistry...");
+    await identityRegistry.addAuthorizedCaller(rumorRegistryAddress);
+
+    // Authorize VotingSystem to call RumorRegistry (recordVote) and IdentityRegistry (incrementVoteCount)
+    console.log("   Authorizing VotingSystem on RumorRegistry...");
+    await rumorRegistry.addAuthorizedCaller(votingSystemAddress);
+    console.log("   Authorizing VotingSystem on IdentityRegistry...");
+    await identityRegistry.addAuthorizedCaller(votingSystemAddress);
+
+    // Authorize VerificationController to call IdentityRegistry (addCredibility, removeCredibility) and RumorRegistry (setVerificationResult)
+    console.log("   Authorizing VerificationController on IdentityRegistry...");
+    await identityRegistry.addAuthorizedCaller(verificationControllerAddress);
+    console.log("   Authorizing VerificationController on RumorRegistry...");
+    await rumorRegistry.addAuthorizedCaller(verificationControllerAddress);
+
+    // Authorize AutomationKeeper to call RumorRegistry (lockRumor)
+    console.log("   Authorizing AutomationKeeper on RumorRegistry...");
+    await rumorRegistry.addAuthorizedCaller(automationKeeperAddress);
+
+    // Authorize CorrelationManager to call RumorRegistry (applyCorrelationBoost)
+    console.log("   Authorizing CorrelationManager on RumorRegistry...");
+    await rumorRegistry.addAuthorizedCaller(correlationManagerAddress);
 
     console.log("\n✅ Deployment complete!\n");
 

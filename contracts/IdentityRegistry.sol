@@ -58,6 +58,7 @@ contract IdentityRegistry is Ownable {
     mapping(address => Student) public students;
     mapping(bytes32 => bool) public emailHMACUsed;
     mapping(uint256 => address) public studentIDToWallet;
+    mapping(address => bool) public authorizedCallers;
 
     // Events
     event StudentRegistered(uint256 indexed studentID, address indexed wallet, uint256 timestamp);
@@ -66,8 +67,27 @@ contract IdentityRegistry is Ownable {
     event PostCountUpdated(uint256 indexed studentID, uint256 totalPosts);
     event VoteCountUpdated(uint256 indexed studentID, uint256 totalVotes);
 
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || authorizedCallers[msg.sender], "Not authorized");
+        _;
+    }
+
     constructor(address _credibilityToken) Ownable(msg.sender) {
         credibilityToken = CredibilityToken(_credibilityToken);
+    }
+
+    /**
+     * @dev Authorize a contract to call state-changing functions
+     */
+    function addAuthorizedCaller(address caller) external onlyOwner {
+        authorizedCallers[caller] = true;
+    }
+
+    /**
+     * @dev Remove an authorized caller
+     */
+    function removeAuthorizedCaller(address caller) external onlyOwner {
+        authorizedCallers[caller] = false;
     }
 
     /**
@@ -171,7 +191,7 @@ contract IdentityRegistry is Ownable {
      * @param wallet Wallet address
      * @param newScore New credibility score
      */
-    function updateCredibility(address wallet, uint256 newScore) external onlyOwner {
+    function updateCredibility(address wallet, uint256 newScore) external onlyAuthorized {
         Student storage student = students[wallet];
         require(student.studentID != 0, "Student not registered");
 
@@ -189,7 +209,7 @@ contract IdentityRegistry is Ownable {
      * @param wallet Wallet address
      * @param points Points to add
      */
-    function addCredibility(address wallet, uint256 points) external onlyOwner {
+    function addCredibility(address wallet, uint256 points) external onlyAuthorized {
         Student storage student = students[wallet];
         require(student.studentID != 0, "Student not registered");
 
@@ -208,7 +228,7 @@ contract IdentityRegistry is Ownable {
      * @param wallet Wallet address
      * @param points Points to remove
      */
-    function removeCredibility(address wallet, uint256 points) external onlyOwner {
+    function removeCredibility(address wallet, uint256 points) external onlyAuthorized {
         Student storage student = students[wallet];
         require(student.studentID != 0, "Student not registered");
 
@@ -232,7 +252,7 @@ contract IdentityRegistry is Ownable {
      * @dev Increment post count for a user
      * @param wallet Wallet address
      */
-    function incrementPostCount(address wallet) external onlyOwner {
+    function incrementPostCount(address wallet) external onlyAuthorized {
         Student storage student = students[wallet];
         require(student.studentID != 0, "Student not registered");
 
@@ -253,7 +273,7 @@ contract IdentityRegistry is Ownable {
      * @dev Increment vote count for a user
      * @param wallet Wallet address
      */
-    function incrementVoteCount(address wallet) external onlyOwner {
+    function incrementVoteCount(address wallet) external onlyAuthorized {
         Student storage student = students[wallet];
         require(student.studentID != 0, "Student not registered");
 

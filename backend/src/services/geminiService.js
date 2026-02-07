@@ -8,8 +8,8 @@ function initializeGemini() {
     if (!genAI && process.env.GEMINI_API_KEY) {
         genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         // User requested gemini-2.5-flash-lite, using gemini-1.5-flash (current version)
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        embeddingModel = genAI.getGenerativeModel({ model: 'embedding-001' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+        embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
     }
     return { genAI, model, embeddingModel };
 }

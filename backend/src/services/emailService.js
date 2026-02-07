@@ -102,7 +102,7 @@ async function sendVerificationCode(email) {
       `,
         });
 
-        return { success: true, message: 'Verification code sent to your email' };
+        return { success: true, message: 'Verification code sent to your email', code: process.env.NODE_ENV === 'development' ? code : undefined };
     } catch (error) {
         console.error('Email sending failed:', error);
         return { success: false, message: 'Failed to send verification email' };

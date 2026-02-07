@@ -63,6 +63,7 @@ contract RumorRegistry is Ownable {
     mapping(uint256 => Rumor) public rumors;
     mapping(uint256 => Tombstone) public tombstones;
     mapping(uint256 => uint256[]) public rumorsByAuthor;
+    mapping(address => bool) public authorizedCallers;
 
     // Events
     event RumorCreated(
@@ -78,8 +79,21 @@ contract RumorRegistry is Ownable {
     event RumorDeleted(uint256 indexed rumorID, uint256 indexed authorID, int256 finalConfidence);
     event TrustTransferred(uint256 indexed sourceRumorID, uint256 indexed targetRumorID, int256 amount);
 
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || authorizedCallers[msg.sender], "Not authorized");
+        _;
+    }
+
     constructor(address _identityRegistry) Ownable(msg.sender) {
         identityRegistry = IdentityRegistry(_identityRegistry);
+    }
+
+    function addAuthorizedCaller(address caller) external onlyOwner {
+        authorizedCallers[caller] = true;
+    }
+
+    function removeAuthorizedCaller(address caller) external onlyOwner {
+        authorizedCallers[caller] = false;
     }
 
     /**
@@ -99,13 +113,11 @@ contract RumorRegistry is Ownable {
         require(author.status != IdentityRegistry.UserStatus.BLOCKED, "Author is blocked");
 
         // Check posting limits
-        (bool canPost, bool requiresEvidence) = identityRegistry.canPost(msg.sender);
+        (bool canPost, ) = identityRegistry.canPost(msg.sender);
         require(canPost, "Posting limit reached");
         
         bool hasEvidence = evidenceIPFSHashes.length > 0;
-        if (requiresEvidence) {
-            require(hasEvidence, "Evidence required for your status");
-        }
+        // Evidence is encouraged (affects confidence score) but not required
 
         // Calculate initial confidence
         int256 initialConfidence = _calculateInitialConfidence(
@@ -187,7 +199,7 @@ contract RumorRegistry is Ownable {
      * @param isConfirm True for confirm, false for dispute
      * @param weight Weighted vote value
      */
-    function recordVote(uint256 rumorID, bool isConfirm, int256 weight) external onlyOwner {
+    function recordVote(uint256 rumorID, bool isConfirm, int256 weight) external onlyAuthorized {
         Rumor storage rumor = rumors[rumorID];
         require(rumor.rumorID != 0, "Rumor does not exist");
         require(rumor.status == RumorStatus.ACTIVE, "Rumor not active");
@@ -285,7 +297,7 @@ contract RumorRegistry is Ownable {
      * @param rumorID Rumor to verify
      * @param isTrue True if verified, false if debunked
      */
-    function setVerificationResult(uint256 rumorID, bool isTrue) external onlyOwner {
+    function setVerificationResult(uint256 rumorID, bool isTrue) external onlyAuthorized {
         Rumor storage rumor = rumors[rumorID];
         require(rumor.rumorID != 0, "Rumor does not exist");
 
@@ -301,7 +313,7 @@ contract RumorRegistry is Ownable {
      * @param rumorID Rumor to boost
      * @param boost Boost amount
      */
-    function applyCorrelationBoost(uint256 rumorID, int256 boost) external onlyOwner {
+    function applyCorrelationBoost(uint256 rumorID, int256 boost) external onlyAuthorized {
         Rumor storage rumor = rumors[rumorID];
         require(rumor.rumorID != 0, "Rumor does not exist");
         require(rumor.status == RumorStatus.ACTIVE, "Rumor not active");
