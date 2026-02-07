@@ -2,16 +2,29 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { useContracts, StudentData } from '@/hooks/useContracts';
+import { getUserProfile } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+
+interface ProfileData {
+    studentID: number;
+    walletAddress: string;
+    credibilityScore: number;
+    status: string;
+    statusName: string;
+    votingPower: number;
+    registeredAt: Date;
+    totalPosts: number;
+    totalVotes: number;
+    accuratePredictions: number;
+    inaccuratePredictions: number;
+}
 
 export default function ProfilePage() {
     const router = useRouter();
     const { token, user, isLoggedIn } = useAuth();
-    const { getStudent, getCredibilityBalance, isRegistered } = useContracts();
 
-    const [profile, setProfile] = useState<StudentData | null>(null);
+    const [profile, setProfile] = useState<ProfileData | null>(null);
     const [tokenBalance, setTokenBalance] = useState(0);
     const [loading, setLoading] = useState(true);
     const [registered, setRegistered] = useState(false);
@@ -27,15 +40,26 @@ export default function ProfilePage() {
     const loadProfile = async (targetAddress: string) => {
         setLoading(true);
         try {
-            const isReg = await isRegistered(targetAddress);
-            setRegistered(isReg);
-
-            if (isReg) {
-                const studentData = await getStudent(targetAddress);
-                setProfile(studentData);
-
-                const balance = await getCredibilityBalance(targetAddress);
-                setTokenBalance(balance);
+            const data = await getUserProfile(targetAddress);
+            if (data) {
+                setRegistered(true);
+                const statusNames = ['NEW_USER', 'CREDIBLE_USER', 'DISCREDITED'];
+                setProfile({
+                    studentID: Number(data.studentID),
+                    walletAddress: data.walletAddress,
+                    credibilityScore: Number(data.credibilityScore),
+                    status: data.status,
+                    statusName: statusNames[Number(data.status)] || data.status,
+                    votingPower: Number(data.votingPower),
+                    registeredAt: new Date(data.registeredAt),
+                    totalPosts: Number(data.totalPosts),
+                    totalVotes: Number(data.totalVotes),
+                    accuratePredictions: Number(data.accuratePredictions),
+                    inaccuratePredictions: Number(data.inaccuratePredictions),
+                });
+                setTokenBalance(Number(data.credibilityScore));
+            } else {
+                setRegistered(false);
             }
         } catch (error) {
             console.error('Error loading profile:', error);

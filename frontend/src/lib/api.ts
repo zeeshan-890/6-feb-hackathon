@@ -123,7 +123,28 @@ export async function getRumors(options?: {
     return data;
 }
 
+// Single rumor detail via backend API
+export async function getRumorById(rumorId: number): Promise<any> {
+    const res = await fetch(`${BACKEND_URL}/api/rumors/${rumorId}`);
+    if (!res.ok) {
+        if (res.status === 404) return null;
+        const data = await res.json();
+        throw new Error(data.error);
+    }
+    return await res.json();
+}
+
 // User APIs
+export async function getUserProfile(address: string): Promise<any> {
+    const res = await fetch(`${BACKEND_URL}/api/users/${address}`);
+    if (!res.ok) {
+        if (res.status === 404) return null;
+        const data = await res.json();
+        throw new Error(data.error);
+    }
+    return await res.json();
+}
+
 export async function getUserStats(address: string): Promise<any> {
     const res = await fetch(`${BACKEND_URL}/api/users/${address}/stats`);
     const data = await res.json();

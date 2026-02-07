@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import { useContracts, RumorData } from '@/hooks/useContracts';
-import { getRumorContent, getIPFSUrl, getCorrelations, voteOnRumor as apiVoteOnRumor, checkUserVoted } from '@/lib/api';
+import { RumorData } from '@/hooks/useContracts';
+import { getRumorById, getIPFSUrl, getCorrelations, voteOnRumor as apiVoteOnRumor, checkUserVoted, getUserStats } from '@/lib/api';
 import VotingPanel from '@/components/VotingPanel';
 import toast from 'react-hot-toast';
 
@@ -21,7 +21,6 @@ export default function RumorDetailPage() {
     const rumorId = parseInt(params.id as string);
 
     const { token, user } = useAuth();
-    const { getRumor, getStudent } = useContracts();
 
     const [rumor, setRumor] = useState<RumorData | null>(null);
     const [content, setContent] = useState<RumorContent | null>(null);
@@ -31,48 +30,68 @@ export default function RumorDetailPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        loadRumor();
-    }, [rumorId, token]);
+        if (rumorId) loadRumor();
+    }, [rumorId]);
 
     const loadRumor = async () => {
         setLoading(true);
         try {
-            const rumorData = await getRumor(rumorId);
-            if (!rumorData) {
+            const data = await getRumorById(rumorId);
+            if (!data) {
                 toast.error('Rumor not found');
                 router.push('/');
                 return;
             }
+
+            // Map backend response to RumorData shape
+            const rumorData: RumorData = {
+                rumorID: Number(data.rumorID),
+                authorID: Number(data.authorID),
+                authorWallet: data.authorWallet,
+                contentHash: data.contentHash,
+                evidenceHashes: data.evidenceHashes || [],
+                hasEvidence: data.hasEvidence,
+                initialConfidence: Number(data.currentConfidence),
+                currentConfidence: Number(data.currentConfidence),
+                status: ['ACTIVE','LOCKED','VERIFIED','DEBUNKED','DELETED'].indexOf(data.status),
+                statusName: data.status,
+                visible: data.visible,
+                createdAt: new Date(data.createdAt),
+                totalConfirmVotes: Number(data.totalConfirmVotes),
+                totalDisputeVotes: Number(data.totalDisputeVotes),
+                keywords: data.keywords || [],
+            };
             setRumor(rumorData);
 
-            // Load content from IPFS
-            if (rumorData.contentHash) {
-                const contentData = await getRumorContent(rumorData.contentHash);
-                setContent(contentData);
+            // Content is already included in the backend response
+            if (data.content) {
+                setContent(data.content);
             }
 
-            // Check if user has voted (using backend or contract read if we knew address)
-            // Ideally backend votes.js should have a GET /votes/:rumorId/me
-            // For now we can use a simple state or try to read from contract if address is known (which we don't know unless we store it in user obj)
-            // Let's assume user.walletAddress is available if we mapped it, but for now we might skip initial check or add a backend endpoint
-            // Adding a simple check if we can
-            if (token) {
-                // In a real implementation we would call API to check status
-                // For now, we'll optimistically allow voting or handle duplicate error
+            // Check if user has voted
+            if (user?.walletAddress) {
+                try {
+                    const voted = await checkUserVoted(user.walletAddress, rumorId);
+                    setUserVoted(voted);
+                } catch (e) { /* ignore */ }
             }
 
-            // Load author info
-            if (rumorData.authorWallet) {
-                const authorData = await getStudent(rumorData.authorWallet);
-                setAuthor(authorData);
+            // Author stats from backend
+            if (data.authorWallet) {
+                try {
+                    const stats = await getUserStats(data.authorWallet);
+                    setAuthor(stats);
+                } catch (e) { /* ignore */ }
             }
 
             // Load correlations
-            try {
-                const corr = await getCorrelations(rumorId);
-                setCorrelations(corr);
-            } catch (e) {
-                // Correlations optional
+            if (data.relatedRumors) {
+                setCorrelations(data.relatedRumors);
+            } else {
+                try {
+                    const corr = await getCorrelations(rumorId);
+                    setCorrelations(corr);
+                } catch (e) { /* optional */ }
             }
         } catch (error) {
             console.error('Error loading rumor:', error);
@@ -262,6 +281,7 @@ export default function RumorDetailPage() {
                 userVoted={userVoted}
                 onVote={handleVote}
                 isConnected={!!token}
+                isAuthor={!!user?.walletAddress && user.walletAddress.toLowerCase() === rumor.authorWallet?.toLowerCase()}
             />
 
             {/* Correlations */}

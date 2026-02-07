@@ -196,7 +196,7 @@ function verifyUserToken(token) {
 
     if (database) {
         try {
-            const stmt = database.prepare('SELECT email_hash, created_at FROM users WHERE token_hash = ?');
+            const stmt = database.prepare('SELECT email_hash, wallet_address, created_at FROM users WHERE token_hash = ?');
             const row = stmt.get(tokenHash);
 
             if (row) {

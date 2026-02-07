@@ -4,12 +4,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import RumorCard from '@/components/RumorCard';
 import { useAuth } from '@/components/AuthProvider';
-import { useContracts } from '@/hooks/useContracts';
-import { getRumorContent } from '@/lib/api';
+import { getRumors } from '@/lib/api';
 
 export default function Home() {
     const { isLoggedIn, user } = useAuth();
-    const { getTotalRumors, getRumor, isRegistered } = useContracts();
 
     const [rumors, setRumors] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -19,79 +17,62 @@ export default function Home() {
 
     useEffect(() => {
         loadRumors();
-        checkRegistration();
-    }, [isLoggedIn, user]);
-
-    const checkRegistration = async () => {
         if (isLoggedIn && user?.walletAddress) {
-            const registered = await isRegistered(user.walletAddress);
-            setUserRegistered(registered);
+            setUserRegistered(true); // If they have a wallet, they're registered
         }
-    };
+    }, [isLoggedIn, user]);
 
     const loadRumors = async () => {
         setLoading(true);
         try {
-            const total = await getTotalRumors();
+            const data = await getRumors({ limit: 20 });
 
-            if (total === 0) {
-                // Show mock data when no rumors exist
-                setRumors([
-                    {
-                        id: 0,
-                        title: "Welcome to Campus Rumors!",
-                        description: "This is an example rumor. Once you register and submit rumors, they will appear here with live blockchain data.",
-                        author: "System",
-                        status: "ACTIVE",
-                        confidence: 50,
-                        confirmVotes: 0,
-                        disputeVotes: 0,
-                        hasEvidence: false,
-                        createdAt: new Date().toISOString(),
-                        keywords: ["welcome", "example"],
-                        isMock: true,
-                    },
-                ]);
+            if (data.total === 0) {
+                setRumors([{
+                    id: 0,
+                    title: "Welcome to Campus Rumors!",
+                    description: "This is an example rumor. Once you register and submit rumors, they will appear here with live blockchain data.",
+                    author: "System",
+                    status: "ACTIVE",
+                    confidence: 50,
+                    confirmVotes: 0,
+                    disputeVotes: 0,
+                    hasEvidence: false,
+                    createdAt: new Date().toISOString(),
+                    keywords: ["welcome", "example"],
+                    isMock: true,
+                }]);
                 setStats({ total: 0, active: 0, votes: 0 });
                 setLoading(false);
                 return;
             }
 
-            // Load rumors from blockchain
-            const loadedRumors = [];
             let activeCount = 0;
             let totalVotes = 0;
 
-            for (let i = 1; i <= Math.min(total, 20); i++) {
-                const rumor = await getRumor(i);
-                if (rumor && rumor.visible) {
-                    // Load content from IPFS
-                    let content = null;
-                    if (rumor.contentHash) {
-                        content = await getRumorContent(rumor.contentHash);
-                    }
+            const loadedRumors = data.rumors.map((r: any) => {
+                const confirmVotes = Number(r.totalConfirmVotes) || 0;
+                const disputeVotes = Number(r.totalDisputeVotes) || 0;
+                if (r.status === 'ACTIVE') activeCount++;
+                totalVotes += confirmVotes + disputeVotes;
 
-                    loadedRumors.push({
-                        id: rumor.rumorID,
-                        title: content?.title || `Rumor #${rumor.rumorID}`,
-                        description: content?.description || 'Content loading...',
-                        author: `Student #${rumor.authorID}`,
-                        status: rumor.statusName,
-                        confidence: rumor.currentConfidence,
-                        confirmVotes: rumor.totalConfirmVotes,
-                        disputeVotes: rumor.totalDisputeVotes,
-                        hasEvidence: rumor.hasEvidence,
-                        createdAt: rumor.createdAt.toISOString(),
-                        keywords: rumor.keywords,
-                    });
+                return {
+                    id: Number(r.rumorID),
+                    title: r.content?.title || `Rumor #${r.rumorID}`,
+                    description: r.content?.description || 'Content loading...',
+                    author: `Student #${r.authorID}`,
+                    status: r.status,
+                    confidence: Number(r.currentConfidence),
+                    confirmVotes,
+                    disputeVotes,
+                    hasEvidence: r.hasEvidence,
+                    createdAt: r.createdAt,
+                    keywords: r.keywords || [],
+                };
+            });
 
-                    if (rumor.statusName === 'ACTIVE') activeCount++;
-                    totalVotes += rumor.totalConfirmVotes + rumor.totalDisputeVotes;
-                }
-            }
-
-            setRumors(loadedRumors.reverse()); // Newest first
-            setStats({ total, active: activeCount, votes: totalVotes });
+            setRumors(loadedRumors);
+            setStats({ total: data.total, active: activeCount, votes: totalVotes });
         } catch (error) {
             console.error('Error loading rumors:', error);
         }
