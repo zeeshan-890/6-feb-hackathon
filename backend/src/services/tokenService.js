@@ -48,12 +48,12 @@ function initDatabase() {
         }
 
         // TEMPORARY: Clear database on start (Requested by user)
-        // try {
-        //     db.exec('DELETE FROM users');
-        //     console.log('⚠️  DATABASE CLEARED: All users deleted.');
-        // } catch (e) {
-        //     console.error('Error clearing users:', e);
-        // }
+        try {
+            db.exec('DELETE FROM users');
+            console.log('⚠️  DATABASE CLEARED: All users deleted.');
+        } catch (e) {
+            console.error('Error clearing users:', e);
+        }
 
         console.log('✅ SQLite database initialized at:', dbPath);
         return db;
