@@ -14,12 +14,14 @@ import "./CredibilityToken.sol";
  */
 contract VerificationController is Ownable {
     // Reward/penalty constants
-    uint256 public constant AUTHOR_REWARD_TRUE = 5;
-    uint256 public constant AUTHOR_PENALTY_FALSE = 10;
-    uint256 public constant VOTER_REWARD_CORRECT = 1;
-    uint256 public constant VOTER_PENALTY_WRONG_CONFIRM = 1;
-    uint256 public constant VOTER_REWARD_CORRECT_DISPUTE = 2;
-    uint256 public constant VOTER_PENALTY_WRONG_DISPUTE = 2;
+    // If rumor is verified TRUE → author gets DOUBLE reward
+    // If rumor is verified FALSE → author gets further penalty (doubled)
+    uint256 public constant AUTHOR_REWARD_TRUE = 10;       // Double reward for true rumor
+    uint256 public constant AUTHOR_PENALTY_FALSE = 20;      // Further decreased for false rumor
+    uint256 public constant VOTER_REWARD_CORRECT = 2;       // Doubled voter reward
+    uint256 public constant VOTER_PENALTY_WRONG_CONFIRM = 2; // Doubled voter penalty
+    uint256 public constant VOTER_REWARD_CORRECT_DISPUTE = 4; // Doubled dispute reward
+    uint256 public constant VOTER_PENALTY_WRONG_DISPUTE = 4;  // Doubled dispute penalty
 
     // State variables
     IdentityRegistry public identityRegistry;

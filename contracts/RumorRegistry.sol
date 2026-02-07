@@ -168,29 +168,24 @@ contract RumorRegistry is Ownable {
         bool hasEvidence,
         uint256 evidenceCount
     ) internal pure returns (int256) {
-        int256 baseScore = hasEvidence ? int256(20 * evidenceCount) : int256(0);
+        // All rumors start with DECREASED confidence on submission.
+        // Evidence reduces the penalty but never makes it positive.
+        // If later verified true → author gets double reward.
+        // If verified false → author gets further penalty.
+        int256 evidenceReduction = hasEvidence ? int256(5 * evidenceCount) : int256(0);
         
         if (status == IdentityRegistry.UserStatus.NEW_USER) {
-            if (hasEvidence) {
-                return (baseScore * 50) / 100; // 50% = 10 for 1 evidence
-            } else {
-                return -15; // Negative for no evidence
-            }
+            // New user: starts very negative
+            return -20 + evidenceReduction; // -20 without evidence, -15 with 1 evidence
         } else if (status == IdentityRegistry.UserStatus.CREDIBLE_USER) {
-            if (hasEvidence) {
-                return (baseScore * 150) / 100; // 150% = 30 for 1 evidence
-            } else {
-                return 0; // Neutral
-            }
+            // Credible user: starts moderately negative
+            return -10 + evidenceReduction; // -10 without evidence, -5 with 1 evidence
         } else if (status == IdentityRegistry.UserStatus.DISCREDITED) {
-            if (hasEvidence) {
-                return (baseScore * 30) / 100; // 30% = 6 for 1 evidence
-            } else {
-                return -25; // Very negative
-            }
+            // Discredited user: starts heavily negative
+            return -30 + evidenceReduction; // -30 without evidence, -25 with 1 evidence
         }
         
-        return 0;
+        return -15; // Default: negative
     }
 
     /**
